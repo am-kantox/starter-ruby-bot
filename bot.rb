@@ -63,11 +63,12 @@ client.on :message do |data|
       lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
       raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
       result = Yandex::API::Translate.do(text, lang)
-      src, dst = if result['lang'].is_a?(String) && result['lang'].length >= 5
+      src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'].length >= 5
         [ ":flag-#{result['lang'][0..1]}:", ":flag-#{result['lang'][-2..-1]}:" ]
       else
         [ lang, 'N/A' ]
       end
+      result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
       raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
       link = format_yandex_link(text, *result['lang'].scan(/(\w{2})-(\w{2})/).first)
       client.message(channel: data['channel'], text: "#{src} “#{text}” ⇒ #{dst} #{result['text']}\n#{link}")
@@ -107,7 +108,7 @@ def format_yandex_link text, lang, src_lang = nil
 end
 
 def format_yandex_reject channel, message, lang, text, result
-  msg = "Failed:\n_Destination language:_ “*#{lang}*”.\n_Text:_ “*#{text}*”.\n_Error:_\n```\n#{message}\n```\n_Result:_ #{result.inspect}"
+  msg = "Failed:\n_Destination language:_ “*#{lang}*”.\n_Text:_ “*#{text}*”.\n_Error:_ #{message}\n_Result:_ #{result.inspect}"
   {
     channel: channel,
       as_user: true,
