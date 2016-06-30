@@ -73,7 +73,7 @@ client.on :message do |data|
       client.message(channel: data['channel'], text: "#{src} “#{text}” ⇒ #{dst} #{result['text']}\n#{link}")
       logger.debug("Translated “#{text}” to “#{result['text']}”")
     rescue => e
-      client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text)
+      client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
       logger.debug("Failed “#{text}” to “#{result['text']}”")
     end
   end
@@ -102,22 +102,23 @@ def help
 end
 
 def format_yandex_link text, lang, src_lang = nil
-  src = src_lang ? "#{src_lang}-" : nil
+  src = (src_lang || (src == 'en' ? 'es' : 'en')) << '-'
   "https://translate.yandex.ru/?text=#{text}&lang=#{src}#{lang}"
 end
 
-def format_yandex_reject channel, message, lang, text
-  msg = "Failed:\n_Destination language:_ “*#{lang}*”.\n_Text:_ “*#{text}*”."
+def format_yandex_reject channel, message, lang, text, result
+  msg = "Failed:\n_Destination language:_ “*#{lang}*”.\n_Text:_ “*#{text}*”.\n_Error:_\n```\n#{message}\n```\n_Result:_ #{result.inspect}"
   {
     channel: channel,
       as_user: true,
       attachments: [
         {
           fallback: msg,
-          pretext: ':thumbsdown: _Yandex.Translate_ was unable to process your request.',
+          pretext: ':thumbsdown: Yandex.Translate was unable to process your request.',
           title: 'Not all services are equally available.',
           title_link: format_yandex_link(text, lang),
           text: msg,
+          mrkdwn_in: [:text],
           color: '#A02020'
         }
       ]
