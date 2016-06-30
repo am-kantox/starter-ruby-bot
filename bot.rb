@@ -34,7 +34,6 @@ end
 
 # listen for message event - https://api.slack.com/events/message
 client.on :message do |data|
-
   case data['text']
   when 'hi', 'bot hi' then
     client.typing channel: data['channel']
@@ -45,11 +44,6 @@ client.on :message do |data|
       client.message channel: data['channel'], text: "It\'s nice to talk to you directly."
       logger.debug("And it was a direct message")
     end
-
-  when 'attachment', 'bot attachment' then
-    # attachment messages require using web_client
-    client.web_client.chat_postMessage(post_message_payload(data))
-    logger.debug("Attachment message posted")
 
   when bot_mentioned(client)
     client.message channel: data['channel'], text: 'You really do care about me. :heart:'
@@ -63,13 +57,26 @@ client.on :message do |data|
     client.message channel: data['channel'], text: "Sorry <@#{data['user']}>, I don\'t understand. \n#{help}"
     logger.debug("Unknown command")
 
-  when /\A(bot\s+)?es\s+/
-    text = data['text'][/\A(?:bot\s+)?es\s+(.*)\z/, 1]
-    result = Yandex::API::Translate.do(text, 'ru').inspect
-    client.message(channel: data['channel'], text: result)
-    logger.debug("Translated “#{text}” to Español (“#{result}”)")
+  # https://translate.yandex.ru/?text=hello%20world&lang=en-ru
+  when /\A(bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+/
+    begin
+      lang, text = data['text'].scan /\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/
+      raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
+      result = Yandex::API::Translate.do(text, lang)
+      src, dst = if result['lang'].is_a?(String) && result['lang'].length >= 5
+        [ ":flag-#{result['lang'][0..1]}:", ":flag-#{result['lang'][-2..-1]}:" ]
+      else
+        [ lang, 'N/A' ]
+      end
+      raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
+      link = format_yandex_link(text, *result['lang'].scan(/(\w{2})-(\w{2})/).first)
+      client.message(channel: data['channel'], text: "#{src} “#{text}” ⇒ #{dst} #{result['text']}\n#{link}")
+      logger.debug("Translated “#{text}” to “#{result['text']}”")
+    rescue => e
+      client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text)
+      logger.debug("Failed “#{text}” to “#{result['text']}”")
+    end
   end
-
 end
 
 def direct_message?(data)
@@ -92,6 +99,29 @@ def help
       `bot attachment` to see a Slack attachment message.\n
       `@<your bot\'s name>` to demonstrate detecting a mention.\n
       `bot help` to see this again.)
+end
+
+def format_yandex_link text, lang, src_lang = nil
+  src = src_lang ? "#{src_lang}-" : nil
+  "https://translate.yandex.ru/?text=#{text}&lang=#{src}#{lang}"
+end
+
+def format_yandex_reject channel, message, lang, text
+  msg = "Failed:\n_Destination language:_ “*#{lang}*”.\n_Text:_ “*#{text}*”."
+  {
+    channel: channel,
+      as_user: true,
+      attachments: [
+        {
+          fallback: msg,
+          pretext: ':thumbsdown: _Yandex.Translate_ was unable to process your request.',
+          title: 'Not all services are equally available.',
+          title_link: format_yandex_link(text, lang),
+          text: msg,
+          color: '#A02020'
+        }
+      ]
+  }
 end
 
 def post_message_payload(data)
