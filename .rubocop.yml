@@ -1,0 +1,81 @@
+inherit_from: .rubocop_todo.yml
+
+# METRICS
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/CyclomaticComplexity:
+  Max: 21
+
+Metrics/LineLength:
+  Max: 180
+
+Metrics/MethodLength:
+  Max: 42
+
+Metrics/PerceivedComplexity:
+  Max: 21
+
+Metrics/AbcSize:
+  Max: 42
+
+# STYLE
+Style/Alias:
+  Exclude:
+    - 'lib/**/*'
+
+Style/SignalException:
+  EnforcedStyle: semantic
+
+Style/FormatString:
+  Exclude:
+    - 'lib/**/*'
+
+Style/MethodDefParentheses:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/AsciiIdentifiers:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/AsciiComments:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/RescueModifier:
+  Exclude:
+    - 'lib/**/*'
+
+Style/EmptyCaseCondition:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/RaiseArgs:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/SpecialGlobalVars:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/MultilineBlockChain:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/Documentation:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'
+
+Style/CaseEquality:
+  Exclude:
+    - 'lib/**/*'
+    - 'spec/**/*'

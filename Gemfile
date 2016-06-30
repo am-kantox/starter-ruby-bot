@@ -5,3 +5,6 @@ gem 'eventmachine'
 gem 'faye-websocket'
 gem 'httparty'
 gem 'logging'
+
+gem 'google-api-client'
+gem 'yandex-api'

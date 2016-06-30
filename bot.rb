@@ -1,6 +1,9 @@
 require 'slack-ruby-client'
 require 'logging'
 
+require 'yandex-api'
+Yandex::API::Translate.load 'yandex_translate.yml'
+
 logger = Logging.logger(STDOUT)
 logger.level = :debug
 
@@ -59,7 +62,14 @@ client.on :message do |data|
   when /^bot/ then
     client.message channel: data['channel'], text: "Sorry <@#{data['user']}>, I don\'t understand. \n#{help}"
     logger.debug("Unknown command")
+
+  when /\A(bot\s+)?es\s+/
+    text = data['text'][/\A(?:bot\s+)?es\s+(.*)\z/, 1]
+    result = Yandex::API::Translate.do(text, 'ru').inspect
+    client.message(channel: data['channel'], text: result)
+    logger.debug("Translated “#{text}” to Español (“#{result}”)")
   end
+
 end
 
 def direct_message?(data)
