@@ -60,7 +60,7 @@ client.on :message do |data|
   # https://translate.yandex.ru/?text=hello%20world&lang=en-ru
   when /\A(bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+/
     begin
-      lang, text = data['text'].scan /\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/
+      lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
       raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
       result = Yandex::API::Translate.do(text, lang)
       src, dst = if result['lang'].is_a?(String) && result['lang'].length >= 5
