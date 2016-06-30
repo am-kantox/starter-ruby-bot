@@ -64,14 +64,15 @@ client.on :message do |data|
       raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
       result = Yandex::API::Translate.do(text, lang)
       src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'].length >= 5
-        [ ":flag-#{result['lang'][0..1]}:", ":flag-#{result['lang'][-2..-1]}:" ]
+        src_lang = result['lang'][0..1] == 'en' ? 'gb' : result['lang'][0..1]
+        dst_lang = result['lang'][-2..-1] == 'en' ? 'gb' : result['lang'][-2..-1]
+        [ ":flag-#{src_lang}:", ":flag-#{dst_lang}:" ]
       else
         [ lang, 'N/A' ]
       end
       result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
       raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
-      link = format_yandex_link(text, *result['lang'].scan(/(\w{2})-(\w{2})/).first)
-      client.message(channel: data['channel'], text: "#{src} “#{text}” ⇒ #{dst} #{result['text']}\n#{link}")
+      client.message(channel: data['channel'], text: "#{src} “#{text}” ⇒ #{dst} #{result['text']}")
       logger.debug("Translated “#{text}” to “#{result['text']}”")
     rescue => e
       client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
