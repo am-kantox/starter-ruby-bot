@@ -63,7 +63,8 @@ client.on :message do |data|
   case data['text']
   when 'hi', 'bot hi' then
     client.typing channel: data['channel']
-    client.message channel: data['channel'], text: "Hello <@#{data['user']}>."
+    sleep 1
+    client.message channel: data['channel'], text: "Hello <@#{data['user']}>.\n#{help}"
     logger.debug("<@#{data['user']}> said hi")
 
     if direct_message?(data)
@@ -72,37 +73,43 @@ client.on :message do |data|
     end
 
   when bot_mentioned(client)
-    client.message channel: data['channel'], text: 'You really do care about me. :heart:'
-    logger.debug("Bot mentioned in channel #{data['channel']}")
+    data['text'] = "#{$`} #{$'}".strip
+    data['text'].prepend('⇒en ') unless data['text'] =~ translate_regex
+    translate data
+    logger.debug("Translation requested in channel #{data['channel']}.")
 
   when 'bot help', 'help' then
     client.message channel: data['channel'], text: help
     logger.debug("A call for help")
 
+  # https://translate.yandex.ru/?text=hello%20world&lang=en-ru
+when translate_regex
+    translate data
+    logger.debug("Direct translation")
+
   when /^bot/ then
     client.message channel: data['channel'], text: "Sorry <@#{data['user']}>, I don\'t understand. \n#{help}"
     logger.debug("Unknown command")
+end
 
-  # https://translate.yandex.ru/?text=hello%20world&lang=en-ru
-  when /\A(bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+/
-    begin
-      lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
-      raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
-      result = Yandex::API::Translate.do(text, lang)
-      src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'] =~ /\A\w{2}-\w{2}\z/
-        src_lang, dst_lang = result['lang'].split('-').map { |l| lang_to_country[l.downcase] }
-        [ ":flag-#{src_lang}:", ":flag-#{dst_lang}:" ]
-      else
-        [ lang, 'N/A' ]
-      end
-      result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
-      raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
-      client.message(channel: data['channel'], text: "#{src}  #{text}  ⇒  #{dst}  *#{result['text']}*")
-      logger.debug("Translated “#{text}” to “#{result['text']}”")
-    rescue => e
-      client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
-      logger.debug("Failed “#{text}” to “#{result['text']}”")
+def translate data
+  begin
+    lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
+    raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
+    result = Yandex::API::Translate.do(text, lang)
+    src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'] =~ /\A\w{2}-\w{2}\z/
+      src_lang, dst_lang = result['lang'].split('-').map { |l| lang_to_country[l.downcase] }
+      [ ":flag-#{src_lang}:", ":flag-#{dst_lang}:" ]
+    else
+      [ lang, 'N/A' ]
     end
+    result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
+    raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
+    client.message(channel: data['channel'], text: "#{src}  #{text}  ⇒  #{dst}  *#{result['text']}*")
+    logger.debug("Translated “#{text}” to “#{result['text']}”")
+  rescue => e
+    client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
+    logger.debug("Failed “#{text}” to “#{result['text']}”")
   end
 end
 
@@ -114,6 +121,10 @@ end
 def bot_mentioned(client)
   # match on any instances of `<@bot_id>` in the message
   /\<\@#{client.self['id']}\>+/
+end
+
+def translate_regex
+  /\A(bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+/
 end
 
 def joiner_is_bot?(client, data)
