@@ -75,8 +75,8 @@ client.on :message do |data|
   when bot_mentioned(client)
     data['text'] = "#{$`} #{$'}".strip
     data['text'].prepend('⇒en ') unless data['text'] =~ translate_regex
-    translate data
     logger.debug("Translation requested in channel #{data['channel']}.")
+    translate client, data, logger
 
   when 'bot help', 'help' then
     client.message channel: data['channel'], text: help
@@ -84,8 +84,7 @@ client.on :message do |data|
 
   # https://translate.yandex.ru/?text=hello%20world&lang=en-ru
   when translate_regex
-    translate data
-    logger.debug("Direct translation")
+    translate client, data, logger
 
   when /^bot/ then
     client.message channel: data['channel'], text: "Sorry <@#{data['user']}>, I don\'t understand. \n#{help}"
@@ -93,25 +92,23 @@ client.on :message do |data|
   end
 end
 
-def translate data
-  begin
-    lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
-    raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
-    result = Yandex::API::Translate.do(text, lang)
-    src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'] =~ /\A\w{2}-\w{2}\z/
-      src_lang, dst_lang = result['lang'].split('-').map { |l| lang_to_country[l.downcase] }
-      [ ":flag-#{src_lang}:", ":flag-#{dst_lang}:" ]
-    else
-      [ lang, 'N/A' ]
-    end
-    result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
-    raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
-    client.message(channel: data['channel'], text: "#{src}  #{text}  ⇒  #{dst}  *#{result['text']}*")
-    logger.debug("Translated “#{text}” to “#{result['text']}”")
-  rescue => e
-    client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
-    logger.debug("Failed “#{text}” to “#{result['text']}”")
+def translate client, data, logger
+  lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
+  raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
+  result = Yandex::API::Translate.do(text, lang)
+  src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'] =~ /\A\w{2}-\w{2}\z/
+    src_lang, dst_lang = result['lang'].split('-').map { |l| lang_to_country[l.downcase] }
+    [ ":flag-#{src_lang}:", ":flag-#{dst_lang}:" ]
+  else
+    [ lang, 'N/A' ]
   end
+  result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
+  raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
+  client.message(channel: data['channel'], text: "#{src}  #{text}  ⇒  #{dst}  *#{result['text']}*")
+  logger.debug("Translated “#{text}” to “#{result['text']}”")
+rescue => e
+  client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
+  logger.debug("Failed “#{text}” to “#{lang}”")
 end
 
 def direct_message?(data)
