@@ -83,13 +83,14 @@ client.on :message do |data|
     logger.debug("A call for help")
 
   # https://translate.yandex.ru/?text=hello%20world&lang=en-ru
-when translate_regex
+  when translate_regex
     translate data
     logger.debug("Direct translation")
 
   when /^bot/ then
     client.message channel: data['channel'], text: "Sorry <@#{data['user']}>, I don\'t understand. \n#{help}"
     logger.debug("Unknown command")
+  end
 end
 
 def translate data
