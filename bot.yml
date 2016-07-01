@@ -1,7 +1,7 @@
 name: Kantox Bot
 description: I am here to help you, Kantox team members!
 avatar: resources/avatar.png
-# author_avatar: resources/avatar.png
+author_avatar: resources/author_avatar.png
 #background: resources/background.png
 #config:
 #  - name: OPTION
