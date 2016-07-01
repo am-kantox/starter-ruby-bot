@@ -4,8 +4,34 @@ require 'logging'
 require 'yandex-api'
 Yandex::API::Translate.load 'yandex_translate.yml'
 
+ISO_639_2 = 'http://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt'.freeze
+LANG_3_TO_COUNTRY = 'http://www.ethnologue.com/sites/default/files/LanguageCodes.tab'.freeze
+LANG_TO_COUNTRY = File.join 'resources', 'lang_to_country.yml'
+
+require 'open-uri'
+require 'yaml'
+def lang_to_country
+  @lang_to_country ||= if File.exist?(LANG_TO_COUNTRY)
+    YAML.load File.read LANG_TO_COUNTRY
+  else
+    open(ISO_639_2) do |c2l|
+      l2l = c2l.read.split(/\R/).map do |w|
+        w = w.split('|')
+        [w[2], w[0]]
+      end.to_h.invert
+
+      open(LANG_3_TO_COUNTRY) do |l2c|
+        l2c.read.split(/\R/)[1..-1].map do |w|
+          w = w.split(/\t/)
+          [l2l[w[0]], w[1].downcase]
+        end.to_h
+      end
+    end.tap { |l2c| File.write(LANG_TO_COUNTRY, l2c.to_yaml) }
+  end.tap { |h| h.default_proc = ->(_, key) { key } }
+end
+
 logger = Logging.logger(STDOUT)
-logger.level = :debug
+logger.level = :info
 
 Slack.configure do |config|
   config.token = ENV['SLACK_TOKEN']
@@ -63,16 +89,15 @@ client.on :message do |data|
       lang, text = data['text'].scan(/\A(?:bot\s+)?(?:2|⇒|to|tr)\s*(\w{2})\s+(.*)\z/).first
       raise "Invalid input" unless lang.is_a?(String) && text.is_a?(String) && text.length > 0
       result = Yandex::API::Translate.do(text, lang)
-      src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'].length >= 5
-        src_lang = result['lang'][0..1] == 'en' ? 'gb' : result['lang'][0..1]
-        dst_lang = result['lang'][-2..-1] == 'en' ? 'gb' : result['lang'][-2..-1]
+      src, dst = if result['code'] == 200 && result['lang'].is_a?(String) && result['lang'] =~ /\A\w{2}-\w{2}\z/
+        src_lang, dst_lang = result['lang'].split('-').map { |l| lang_to_country[l.downcase] }
         [ ":flag-#{src_lang}:", ":flag-#{dst_lang}:" ]
       else
         [ lang, 'N/A' ]
       end
       result['text'] = result['text'].join(', ') if result['text'].is_a?(Array)
       raise "Translation failed" unless result['text'].is_a?(String) && result['text'].length > 0
-      client.message(channel: data['channel'], text: "#{src} “#{text}” ⇒ #{dst} #{result['text']}")
+      client.message(channel: data['channel'], text: "#{src}  #{text}  ⇒  #{dst}  *#{result['text']}*")
       logger.debug("Translated “#{text}” to “#{result['text']}”")
     rescue => e
       client.web_client.chat_postMessage(format_yandex_reject data['channel'], e.message, lang, text, result)
@@ -98,7 +123,7 @@ end
 def help
   %Q(I will respond to the following messages: \n
       `bot hi` for a simple message.\n
-      `bot attachment` to see a Slack attachment message.\n
+      `2es` or `⇒ru` or `to en` for a translations to a desired language.\n
       `@<your bot\'s name>` to demonstrate detecting a mention.\n
       `bot help` to see this again.)
 end
