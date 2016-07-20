@@ -64,7 +64,7 @@ client.on :message do |data|
   when 'hi', 'bot hi' then
     client.typing channel: data['channel']
     sleep 1
-    client.message channel: data['channel'], text: "Hello <@#{data['user']}>.\n#{help}"
+    client.message channel: data['channel'], text: "Hello <@#{data['user']}>. Qué tal?\n#{help}"
     logger.debug("<@#{data['user']}> said hi")
 
     if direct_message?(data)
